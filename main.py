@@ -33,7 +33,8 @@ def _bytesio_hash(b):
 def _read_csv_cached(file_bytes, encoding):
     return pd.read_csv(io.BytesIO(file_bytes), encoding=encoding)
 
-def load_csv_fallback uploaded_file):
+# ✦✦✦ 수정된 부분: def 뒤 괄호 추가 ✦✦✦
+def load_csv_fallback(uploaded_file):
     """utf-8-sig 우선, 실패 시 cp949 fallback"""
     if uploaded_file is None:
         return None
@@ -156,7 +157,7 @@ with tab1:
         "### 연구 배경 및 목적\n"
         "극지환경(한랭·건조·낮은 영양)을 모사한 조건에서 식물을 재배할 때, "
         "같은 환경이라도 **개체마다 생육 결과가 다르게 나타납니다.**\n\n"
-        "이 대시보드는 우리 학교極地식물 실험에서 얻은 "
+        "이 대시보드는 우리 학교 극지식물 실험에서 얻은 "
         "**개체별 생육 데이터**와 **환경 데이터**를 한눈에 비교하고, "
         "생중량(생물체 전체 무게)을 중심으로 개체 간 차이가 얼마나 큰지, "
         "잎 수·길이 같은 측정 항목과 생중량이 어떤 관계에 있는지 살펴보는 도구입니다.\n\n"
@@ -182,13 +183,16 @@ with tab1:
             env_start = env_dates.min().strftime('%Y-%m-%d') if len(env_dates) else "–"
             env_end   = env_dates.max().strftime('%Y-%m-%d') if len(env_dates) else "–"
             env_ndays = (env_dates.dt.date.nunique()) if len(env_dates) else 0
-            summary_rows.append(("환경 데이터", f"{len(df_env):,}행", f"측정 기간: {env_start} ~ {env_end} ({env_ndays}일)", ", ".join(env_cols)))
+            summary_rows.append(("환경 데이터", f"{len(df_env):,}행",
+                                 f"측정 기간: {env_start} ~ {env_end} ({env_ndays}일)",
+                                 ", ".join(env_cols)))
         else:
             summary_rows.append(("환경 데이터", "업로드되지 않음", "–", "–"))
 
         if df_grt is not None:
             grt_cols = list(df_grt.columns)
-            summary_rows.append(("생육 결과 데이터", f"{len(df_grt):,}개체", "1회 측정 (개체별)", ", ".join(grt_cols)))
+            summary_rows.append(("생육 결과 데이터", f"{len(df_grt):,}개체",
+                                 "1회 측정 (개체별)", ", ".join(grt_cols)))
         else:
             summary_rows.append(("생육 결과 데이터", "업로드되지 않음", "–", "–"))
 
@@ -200,26 +204,21 @@ with tab1:
         st.markdown("### 📊 주요 지표")
         c1, c2, c3, c4 = st.columns(4)
 
-        # 총 개체수
         n_total = len(df_grt) if df_grt is not None else 0
-        c1.metric("총 개체 수", f"{n_total}개체", delta=None,
-                  delta_color="off")
+        c1.metric("총 개체 수", f"{n_total}개체", delta=None, delta_color="off")
 
-        # 평균 온도
         if df_env is not None and 'temperature' in df_env.columns:
             t_mean = df_env['temperature'].mean()
             c2.metric("평균 온도", f"{t_mean:.1f} ℃", delta=None, delta_color="off")
         else:
             c2.metric("평균 온도", "데이터 없음", delta=None, delta_color="off")
 
-        # 평균 습도
         if df_env is not None and 'humidity' in df_env.columns:
             h_mean = df_env['humidity'].mean()
             c3.metric("평균 습도", f"{h_mean:.1f} %", delta=None, delta_color="off")
         else:
             c3.metric("평균 습도", "데이터 없음", delta=None, delta_color="off")
 
-        # 평균 생중량
         if df_grt is not None and '생중량(g)' in df_grt.columns:
             gw_mean = df_grt['생중량(g)'].mean()
             c4.metric("평균 생중량", f"{gw_mean:.2f} g", delta=None, delta_color="off")
@@ -242,7 +241,6 @@ with tab2:
     if df_env is None:
         st.info("📎 사이드바에서 **환경 데이터 CSV**를 업로드하면 환경 데이터 탭이 활성화됩니다.")
     else:
-        # 환경 컬럼 자동 탐지
         has_temp = 'temperature' in df_env.columns
         has_hum  = 'humidity'  in df_env.columns
         has_ph   = 'ph'        in df_env.columns
@@ -288,7 +286,6 @@ with tab2:
         daily = df_env.groupby('date').mean(numeric_only=True).reset_index()
         daily['date'] = pd.to_datetime(daily['date'])
 
-        # Plotly 서브플롯 구성
         n_plots = sum([has_temp, has_hum, has_ph, has_ec, has_wt, has_co2])
         if n_plots > 0:
             fig_env = make_subplots(
@@ -337,16 +334,8 @@ with tab2:
                 font=dict(family="Malgun Gothic, Apple SD Gothic Neo, sans-serif", size=12),
                 showlegend=True,
                 hovermode='x unified',
-                xaxis=dict(
-                    tickformat='%m/%d',
-                    showgrid=True, gridcolor='#e0e0e0',
-                ),
+                xaxis=dict(tickformat='%m/%d', showgrid=True, gridcolor='#e0e0e0'),
             )
-            # 사용하지 않은 subplot 제목 제거
-            for i in range(n_plots + 1, len(fig_env._grid_ref[0])):
-                fig_env._grid_ref[0][i].delete_trace(fig_env.data[i], row=1, col=1) \
-                    if hasattr(fig_env, 'data') else None
-            fig_env.update_xaxes(showgrid=True, gridcolor='#f0f0f0')
             st.plotly_chart(fig_env, key="env_timeseries", width='stretch')
         else:
             st.warning("⚠️ 환경 데이터에서 그래프로 그릴 열을 찾을 수 없습니다. (temperature, humidity 등 필요)")
@@ -374,14 +363,11 @@ with tab3:
     if df_grt is None:
         st.info("📎 사이드바에서 **생육 결과 데이터 CSV**를 업로드하면 생육 결과 탭이 활성화됩니다.")
     else:
-        # ── 개체번호 제외한 측정 열 자동 탐지 ──
         ALL_COLS  = list(df_grt.columns)
         ID_COL    = '개체번호' if '개체번호' in ALL_COLS else None
         MEAS_COLS = [c for c in ALL_COLS if c != ID_COL]
         GW_COL    = '생중량(g)' if '생중량(g)' in ALL_COLS else None
 
-        # ── 사이드바 측정 항목 선택 (이미 사이드바에 있음 → 여기에서도 동기화) ──
-        # (사이드바 선택을 tab3에서 사용할 수 있도록 st.session_state 활용)
         if 'selected_measure' not in st.session_state:
             st.session_state.selected_measure = [GW_COL] if GW_COL else MEAS_COLS[:1]
 
@@ -406,34 +392,28 @@ with tab3:
             gw_mean = gw.mean()
             gw_max  = gw.max()
             gw_min  = gw.min()
-            gw_std  = gw.std()
 
-            # 최대 개체
             max_row = df_grt.loc[gw.idxmax()]
             max_id  = max_row[ID_COL] if ID_COL else "–"
-            # 최소 개체
             min_row = df_grt.loc[gw.idxmin()]
             min_id  = min_row[ID_COL] if ID_COL else "–"
 
             gc1.metric("평균 생중량", f"{gw_mean:.2f} g", delta=None, delta_color="off")
             gc2.metric("최대 생중량", f"{gw_max:.2f} g",
-                       delta=f"개체번호 {max_id}",
-                       delta_color="normal")
+                       delta=f"개체번호 {max_id}", delta_color="normal")
             gc3.metric("최소 생중량", f"{gw_min:.2f} g",
-                       delta=f"개체번호 {min_id}",
-                       delta_color="normal")
+                       delta=f"개체번호 {min_id}", delta_color="normal")
         else:
             st.warning("⚠️ '생중량(g)' 열을 찾을 수 없습니다. CSV 컬럼 이름을 확인해 주세요.")
 
         st.caption(
             f"▲ {TERM_MEAN}  ▲ {TERM_STD}  "
-            "생중량 상위 25% / 하위 25% 비교는 아래 산점도·분포도에서 확인할 수 있습니다."
+            "생중량 상위 25% / 하위 25% 비교는 아래 분포도에서 확인할 수 있습니다."
         )
 
         # ── 개체별 생육 비교 (막대 그래프) ──
         st.markdown("### 📊 개체별 생육 비교 (막대 그래프)")
         if selected_m:
-            # 행 번호(index)를 막대 라벨로 사용 (개체번호 제외)
             plot_df = df_grt[selected_m].copy()
             plot_df.index = range(1, len(plot_df) + 1)
             plot_df.index.name = '개체'
@@ -500,7 +480,6 @@ with tab3:
                 marker=dict(size=4),
                 line_color='#1a535c',
             )
-            # 상위 25%, 하위 25% 기준선
             fig_box.add_hline(y=q75, line_dash="dot", line_color='#ff6b6b',
                               annotation_text=f"상위 25% 기준: {q75:.2f} g",
                               annotation_position="top right",
@@ -519,7 +498,6 @@ with tab3:
             )
             st.plotly_chart(fig_box, key="growth_box", width='stretch')
 
-            # 박스플롯 아래 텍스트로 요약
             iqr = q75 - q25
             cv_gw = (gw_data.std() / gw_data.mean() * 100) if gw_data.mean() else float('nan')
             st.markdown(
@@ -530,8 +508,8 @@ with tab3:
                 f"- 사분위범위(IQR): {iqr:.2f} g\n"
                 f"- 변동계수(CV): **{cv_gw:.1f}%** {TERM_CV}\n"
                 f"\n"
-                f"💡 붉은 점선(10.75 g) 이상 개체가 상위 25%, "
-                f"보라 점선(5.30 g) 이하 개체가 하위 25%입니다."
+                f"💡 붉은 점선(상위 25% 기준) 이상 개체가 상위 25%, "
+                f"보라 점선(하위 25% 기준) 이하 개체가 하위 25%입니다."
             )
         else:
             st.warning("⚠️ '생중량(g)' 열이 없어 분포도를 표시할 수 없습니다.")
@@ -539,30 +517,24 @@ with tab3:
         # ── 상관관계 분석 (산점도 2개) ──
         st.markdown("### 🔗 상관관계 분석 (산점도)")
         corr_pairs = [
-            ('잎 수(장)',     '생중량(g)',  '잎 수(장)',   '생중량 (g)'),
+            ('잎 수(장)',     '생중량(g)',  '잎 수(장)',    '생중량 (g)'),
             ('지상부 길이(mm)', '생중량(g)', '지상부 길이 (mm)', '생중량 (g)'),
         ]
 
-        n_corr = sum(
-            1 for x, y, *_ in corr_pairs
-            if x in df_grt.columns and y in df_grt.columns
-        )
+        valid_pairs = [(x, y, xl, yl) for x, y, xl, yl in corr_pairs
+                       if x in df_grt.columns and y in df_grt.columns]
+        n_corr = len(valid_pairs)
 
         if n_corr > 0:
             fig_corr = make_subplots(
                 rows=n_corr, cols=1,
                 shared_xaxes=False,
-                subplot_titles=[
-                    f"{x_label} vs 생중량" for x_label, *_ in
-                    [(x, y) for x, y, xl, yl in corr_pairs if x in df_grt.columns and y in df_grt.columns]
-                ],
+                subplot_titles=[f"{xl} vs 생중량" for _, _, xl, _ in valid_pairs],
                 vertical_spacing=0.12,
             )
 
             row_i = 1
-            for x_col, y_col, x_label, y_label in corr_pairs:
-                if x_col not in df_grt.columns or y_col not in df_grt.columns:
-                    continue
+            for x_col, y_col, x_label, y_label in valid_pairs:
                 sub = df_grt[[x_col, y_col]].dropna()
                 r_val = sub[x_col].corr(sub[y_col])
 
@@ -580,7 +552,7 @@ with tab3:
                     row=row_i, col=1,
                 )
 
-                # 추세선 (numpy polyfit으로 직접 그리기 — px.scatter trendline 사용 금지)
+                # 추세선 직접 그리기 (px.scatter trendline 사용 금지)
                 z = np.polyfit(sub[x_col], sub[y_col], 1)
                 p = np.poly1d(z)
                 x_line = np.linspace(sub[x_col].min(), sub[x_col].max(), 100)
@@ -595,11 +567,11 @@ with tab3:
                     row=row_i, col=1,
                 )
 
-                # 상관계수 annotation
                 fig_corr.add_annotation(
                     x=0.95, y=0.05, xref='paper', yref='paper',
                     text=f"r = {r_val:.3f}",
-                    font=dict(size=13, color='#2d3436', family="Malgun Gothic, Apple SD Gothic Neo, sans-serif"),
+                    font=dict(size=13, color='#2d3436',
+                              family="Malgun Gothic, Apple SD Gothic Neo, sans-serif"),
                     bgcolor='#ffffffcc',
                     bordercolor='#b2bec3',
                     borderwidth=1,
@@ -615,14 +587,14 @@ with tab3:
                 font=dict(family="Malgun Gothic, Apple SD Gothic Neo, sans-serif", size=12),
                 showlegend=False,
             )
-            for i in range(1, n_corr + 1):
+            for i, (_, _, x_label, y_label) in enumerate(valid_pairs):
                 fig_corr.update_xaxes(
-                    title_text=corr_pairs[[x for x, y, xl, yl in corr_pairs if x in df_grt.columns and y in df_grt.columns][i-1]][2],
-                    showgrid=True, gridcolor='#f0f0f0', row=i, col=1,
+                    title_text=x_label,
+                    showgrid=True, gridcolor='#f0f0f0', row=i + 1, col=1,
                 )
                 fig_corr.update_yaxes(
-                    title_text=corr_pairs[[x for x, y, xl, yl in corr_pairs if x in df_grt.columns and y in df_grt.columns][i-1]][3],
-                    showgrid=True, gridcolor='#f0f0f0', row=i, col=1,
+                    title_text=y_label,
+                    showgrid=True, gridcolor='#f0f0f0', row=i + 1, col=1,
                 )
             st.plotly_chart(fig_corr, key="growth_corr", width='stretch')
 
